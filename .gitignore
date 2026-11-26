@@ -23,3 +23,7 @@ coverage/
 .DS_Store
 .vscode/
 .idea/
+
+# Generated Prisma Client
+apps/api/generated/
+apps/api/src/generated/
