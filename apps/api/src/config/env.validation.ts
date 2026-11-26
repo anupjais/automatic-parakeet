@@ -14,6 +14,25 @@ export const envValidationSchema = Joi.object({
   OBSERVE_APP_KEY: Joi.string().trim().required(),
 
   OBSERVE_APP_SECRET: Joi.string().trim().required(),
+
+  // JWT Authentication
+  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
+
+  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+
+  JWT_ACCESS_TTL: Joi.string().default('15m'),
+
+  JWT_REFRESH_TTL: Joi.string().default('7d'),
+
+  // Cookie Configuration
+  COOKIE_SECURE: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.boolean().valid(true).default(true),
+      otherwise: Joi.boolean().default(false),
+    }),
 }).prefs({
   abortEarly: false,
 });
