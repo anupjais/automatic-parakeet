@@ -9,6 +9,8 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+import cookieParser from 'cookie-parser';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
@@ -16,7 +18,8 @@ async function bootstrap() {
       json: true,
     }),
   });
-
+  
+  app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(
