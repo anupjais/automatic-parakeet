@@ -174,10 +174,31 @@ export class AuthService {
         return { status: 'REUSED' as const };
       }
 
-      if (
-        session.expiresAt <= now ||
-        session.user.status !== UserStatus.ACTIVE
-      ) {
+      if (session.expiresAt <= now) {
+        await tx.refreshSession.updateMany({
+          where: {
+            id: session.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+          },
+        });
+
+        return { status: 'INVALID' as const };
+      }
+
+      if (session.user.status !== UserStatus.ACTIVE) {
+        await tx.refreshSession.updateMany({
+          where: {
+            sessionFamilyId: session.sessionFamilyId,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+          },
+        });
+
         return { status: 'INVALID' as const };
       }
 

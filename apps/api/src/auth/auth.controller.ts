@@ -20,6 +20,9 @@ import {
   getRefreshCookieOptions,
 } from './utils/refresh-cookie.util.js';
 
+import { UseGuards } from '@nestjs/common';
+import { CsrfGuard } from './guards/csrf.guard.js';
+
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -60,6 +63,7 @@ export class AuthController {
     return publicResult;
   }
 
+  @UseGuards(CsrfGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate refresh token' })
@@ -83,6 +87,7 @@ export class AuthController {
     return publicResult;
   }
 
+  @UseGuards(CsrfGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and revoke refresh session' })

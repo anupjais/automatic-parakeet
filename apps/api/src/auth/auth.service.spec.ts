@@ -124,18 +124,60 @@ describe('AuthService', () => {
     expect(txMock.refreshSession.create).not.toHaveBeenCalled();
   });
 
-  it('should reject an expired refresh token', async () => {
+  it('should revoke and reject an expired refresh token', async () => {
     txMock.refreshSession.findUnique.mockResolvedValue({
       ...session,
       expiresAt: new Date(Date.now() - 1000),
       revokedAt: null,
     });
 
+    txMock.refreshSession.updateMany.mockResolvedValue({ count: 1 });
+
     await expect(service.refresh('old-refresh-token')).rejects.toThrow(
       UnauthorizedException,
     );
 
+    expect(txMock.refreshSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: session.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+
     expect(txMock.refreshSession.create).not.toHaveBeenCalled();
+    expect(jwtMock.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('should revoke the session family for an inactive user', async () => {
+    txMock.refreshSession.findUnique.mockResolvedValue({
+      ...session,
+      user: {
+        ...activeUser,
+        status: UserStatus.SUSPENDED,
+      },
+    });
+
+    txMock.refreshSession.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(service.refresh('old-refresh-token')).rejects.toThrow(
+      UnauthorizedException,
+    );
+
+    expect(txMock.refreshSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        sessionFamilyId: session.sessionFamilyId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+
+    expect(txMock.refreshSession.create).not.toHaveBeenCalled();
+    expect(jwtMock.signAsync).not.toHaveBeenCalled();
   });
 
   it('should revoke a refresh token during logout', async () => {
