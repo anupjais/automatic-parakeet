@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+
+import { CsrfGuard } from './guards/csrf.guard.js';
 
 @Module({
   imports: [
@@ -15,13 +16,16 @@ import { AuthService } from './auth.service.js';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_ACCESS_TTL', '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
+          expiresIn: configService.get<string>(
+            'JWT_ACCESS_TTL',
+            '15m',
+          ) as `${number}${'s' | 'm' | 'h' | 'd'}`,
         },
       }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, CsrfGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

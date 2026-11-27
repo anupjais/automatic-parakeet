@@ -33,6 +33,16 @@ export const envValidationSchema = Joi.object({
       then: Joi.boolean().valid(true).default(true),
       otherwise: Joi.boolean().default(false),
     }),
+
+  FRONTEND_ORIGIN: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string()
+      .uri({ scheme: ['https'] })
+      .required(),
+    otherwise: Joi.string()
+      .uri({ scheme: ['http', 'https'] })
+      .default('http://localhost:3001'),
+  }),
 }).prefs({
   abortEarly: false,
 });
