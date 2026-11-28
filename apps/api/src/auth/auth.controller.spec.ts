@@ -44,4 +44,15 @@ describe('AuthController', () => {
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
+
+  it('should return the authenticated user profile', () => {
+    const user = {
+      id: 'user-uuid-123',
+      name: 'Test Customer',
+      email: 'customer@example.com',
+      role: 'CUSTOMER',
+    };
+
+    expect(controller.getProfile(user)).toEqual(user);
+  });
 });

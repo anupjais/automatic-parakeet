@@ -18,7 +18,7 @@ async function bootstrap() {
       json: true,
     }),
   });
-  
+
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
 
@@ -37,7 +37,8 @@ async function bootstrap() {
     .setTitle('Premium E-commerce API')
     .setDescription('API documentation for the Premium E-commerce platform')
     .setVersion('v1')
-    .addServer('/api/v1')
+    .addServer('/')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
