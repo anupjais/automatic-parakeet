@@ -51,6 +51,12 @@ describe('Admin RBAC (e2e)', () => {
         password,
       })
       .expect(201);
+    await prisma.user.update({
+      where: { email: customerEmail },
+      data: {
+        emailVerifiedAt: new Date(),
+      },
+    });
 
     // Login CUSTOMER.
     const customerLogin = await request(app.getHttpServer())
@@ -73,7 +79,7 @@ describe('Admin RBAC (e2e)', () => {
     // Promote the isolated test account to ADMIN.
     await prisma.user.update({
       where: { email: adminEmail },
-      data: { role: UserRole.ADMIN },
+      data: { role: UserRole.ADMIN, emailVerifiedAt: new Date() },
     });
 
     // Login after promotion to obtain an ADMIN token.

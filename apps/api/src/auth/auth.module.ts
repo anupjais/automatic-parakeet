@@ -12,9 +12,12 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
 
+import { EmailModule } from '../email/email.module.js';
+
 @Module({
   imports: [
     DatabaseModule,
+    EmailModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
     }),
