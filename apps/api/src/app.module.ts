@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
+
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AppConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -20,6 +22,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'api',
     }),
     AuthModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

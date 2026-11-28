@@ -16,11 +16,12 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Good Evening!\nGood to Go..');
+  it('/ (GET)', async () => {
+    await request(app.getHttpServer()).get('/').expect(200).expect({
+      message: 'Premium E-commerce API',
+      role: 'ADMIN',
+      version: 'v1',
+    });
   });
 
   afterEach(async () => {
