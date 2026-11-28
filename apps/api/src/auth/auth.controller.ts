@@ -1,15 +1,17 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
-  Res,
   Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
+
 import type { Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -20,9 +22,12 @@ import {
   getRefreshCookieOptions,
 } from './utils/refresh-cookie.util.js';
 
-import { UseGuards } from '@nestjs/common';
 import { CsrfGuard } from './guards/csrf.guard.js';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from './decorators/current-user.decorator.js';
+import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 
+import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface.js';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -48,11 +53,9 @@ export class AuthController {
     const result = await this.authService.login(dto);
     const { refreshToken, ...publicResult } = result;
 
-    const secure = this.configService.get<boolean>('COOKIE_SECURE', false);
-
-    const refreshTtl = this.configService.get<string>('JWT_REFRESH_TTL', '7d');
-
-    const cookieName = secure ? '__Host-refresh_token' : 'refresh_token';
+    // const secure = this.configService.get<boolean>('COOKIE_SECURE', false);
+    // const refreshTtl = this.configService.get<string>('JWT_REFRESH_TTL', '7d');
+    // const cookieName = secure ? '__Host-refresh_token' : 'refresh_token';
 
     response.cookie(
       getRefreshCookieName(this.configService),
@@ -107,5 +110,13 @@ export class AuthController {
     response.clearCookie(cookieName, clearOptions);
 
     return result;
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiOperation({ summary: 'Get authenticated user profile' })
+  getProfile(@CurrentUser() user: AuthenticatedUser) {
+    return user;
   }
 }
