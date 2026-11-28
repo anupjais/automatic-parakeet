@@ -23,11 +23,19 @@ import {
 } from './utils/refresh-cookie.util.js';
 
 import { CsrfGuard } from './guards/csrf.guard.js';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface.js';
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
+
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -120,10 +128,29 @@ export class AuthController {
     return user;
   }
 
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserRole.ADMIN)
-  // @Get('admin/dashboard')
-  // getDashboard() {
-  //   return { message: 'Welcome Admin!' };
-  // }
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify user email address' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email verified successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid, expired, or already-used token',
+  })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  @ApiResponse({
+    status: 200,
+    description: 'Verification request processed',
+  })
+  async resendVerificationEmail(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(dto.email);
+  }
 }

@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import * as bcrypt from 'bcrypt';
@@ -14,7 +15,7 @@ import { UserStatus } from '../generated/prisma/enums.js';
 import { LoginDto } from './dto/login.dto.js';
 
 import { ConfigService } from '@nestjs/config';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, createHash, randomBytes } from 'node:crypto';
 
 import {
   generateRefreshToken,
@@ -23,7 +24,10 @@ import {
 
 import { parseDurationMs } from './utils/duration.util.js';
 
+import { EmailService } from '../email/email.service.js';
+
 const BCRYPT_ROUNDS = 12;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -31,6 +35,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -53,24 +58,173 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name.trim(),
-        email,
-        passwordHash,
-        role: 'CUSTOMER',
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true,
-        createdAt: true,
-      },
+    const verificationToken = randomBytes(32).toString('base64url');
+
+    const tokenHash = createHash('sha256')
+      .update(verificationToken)
+      .digest('hex');
+
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name: dto.name.trim(),
+          email,
+          passwordHash,
+          role: 'CUSTOMER',
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      await tx.emailVerificationToken.create({
+        data: {
+          userId: createdUser.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      return createdUser;
     });
 
-    return user;
+    await this.emailService.sendVerificationEmail(
+      user.email,
+      verificationToken,
+    );
+
+    return {
+      message: 'Registration successful. Please verify your email address.',
+      user,
+    };
+  }
+
+  async resendVerificationEmail(emailAddress: string) {
+    const email = emailAddress.trim().toLowerCase();
+
+    const verificationToken = randomBytes(32).toString('base64url');
+
+    const tokenHash = createHash('sha256')
+      .update(verificationToken)
+      .digest('hex');
+
+    const now = new Date();
+
+    const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          emailVerifiedAt: true,
+        },
+      });
+
+      if (!existingUser || existingUser.emailVerifiedAt) {
+        return null;
+      }
+
+      await tx.emailVerificationToken.deleteMany({
+        where: {
+          userId: existingUser.id,
+          usedAt: null,
+        },
+      });
+
+      await tx.emailVerificationToken.create({
+        data: {
+          userId: existingUser.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      return existingUser;
+    });
+
+    if (user) {
+      try {
+        await this.emailService.sendVerificationEmail(
+          user.email,
+          verificationToken,
+        );
+      } catch {
+        // EmailService logs delivery failures.
+        // Keep the public response generic to avoid email enumeration.
+      }
+    }
+
+    return {
+      message:
+        'If an unverified account exists for this email, a verification link will be sent.',
+    };
+  }
+  async verifyEmail(token: string) {
+    if (!token) {
+      throw new BadRequestException('Verification token is required');
+    }
+
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
+    const now = new Date();
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const verificationToken = await tx.emailVerificationToken.findUnique({
+        where: { tokenHash },
+        include: { user: true },
+      });
+
+      if (!verificationToken || verificationToken.usedAt) {
+        return false;
+      }
+
+      if (verificationToken.expiresAt <= now) {
+        return false;
+      }
+
+      const consumed = await tx.emailVerificationToken.updateMany({
+        where: {
+          id: verificationToken.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          usedAt: now,
+        },
+      });
+
+      if (consumed.count !== 1) {
+        return false;
+      }
+
+      await tx.user.update({
+        where: { id: verificationToken.userId },
+        data: {
+          emailVerifiedAt: now,
+        },
+      });
+
+      return true;
+    });
+
+    if (!result) {
+      throw new BadRequestException(
+        'Invalid, expired, or already-used verification token',
+      );
+    }
+
+    return {
+      message: 'Email verified successfully. You can now log in.',
+    };
   }
 
   async login(dto: LoginDto) {
@@ -95,6 +249,12 @@ export class AuthService {
 
     if (!passwordMatches || user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new UnauthorizedException(
+        'Please verify your email address before logging in',
+      );
     }
 
     const accessToken = await this.jwtService.signAsync({
