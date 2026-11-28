@@ -7,10 +7,15 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 
 import { CsrfGuard } from './guards/csrf.guard.js';
-
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './strategies/jwt.strategy.js';
+import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 @Module({
   imports: [
     DatabaseModule,
+    PassportModule.register({
+      defaultStrategy: 'jwt',
+    }),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -25,7 +30,7 @@ import { CsrfGuard } from './guards/csrf.guard.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, CsrfGuard],
-  exports: [AuthService],
+  providers: [AuthService, CsrfGuard, JwtStrategy,JwtAuthGuard],
+  exports: [AuthService, PassportModule],
 })
 export class AuthModule {}
